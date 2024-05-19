@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"runtime"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -52,15 +53,24 @@ type DefaultManager struct {
 	notifier             *notifier
 	routeRefCounter      *refcounter.RouteRefCounter
 	allowedIPsRefCounter *refcounter.AllowedIPsRefCounter
+	dnsRouteInterval     time.Duration
 }
 
-func NewManager(ctx context.Context, pubKey string, wgInterface *iface.WGIface, statusRecorder *peer.Status, initialRoutes []*route.Route) *DefaultManager {
+func NewManager(
+	ctx context.Context,
+	pubKey string,
+	dnsRouteInterval time.Duration,
+	wgInterface *iface.WGIface,
+	statusRecorder *peer.Status,
+	initialRoutes []*route.Route,
+) *DefaultManager {
 	mCTX, cancel := context.WithCancel(ctx)
 	routingManager := systemops.NewRoutingManager(wgInterface)
 
 	dm := &DefaultManager{
 		ctx:            mCTX,
 		stop:           cancel,
+    dnsRouteInterval: dnsRouteInterval,
 		clientNetworks: make(map[route.HAUniqueID]*clientNetwork),
 		routeSelector:  routeselector.NewRouteSelector(),
 		routingManager: routingManager,
@@ -226,7 +236,7 @@ func (m *DefaultManager) TriggerSelection(networks route.HAMap) {
 			continue
 		}
 
-		clientNetworkWatcher := newClientNetworkWatcher(m.ctx, m.wgInterface, m.statusRecorder, routes[0], m.routeRefCounter, m.allowedIPsRefCounter)
+		clientNetworkWatcher := newClientNetworkWatcher(m.ctx, m.dnsRouteInterval, m.wgInterface, m.statusRecorder, routes[0], m.routeRefCounter, m.allowedIPsRefCounter)
 		m.clientNetworks[id] = clientNetworkWatcher
 		go clientNetworkWatcher.peersStateAndUpdateWatcher()
 		clientNetworkWatcher.sendUpdateToClientNetworkWatcher(routesUpdate{routes: routes})
@@ -251,7 +261,7 @@ func (m *DefaultManager) updateClientNetworks(updateSerial uint64, networks rout
 	for id, routes := range networks {
 		clientNetworkWatcher, found := m.clientNetworks[id]
 		if !found {
-			clientNetworkWatcher = newClientNetworkWatcher(m.ctx, m.wgInterface, m.statusRecorder, routes[0], m.routeRefCounter, m.allowedIPsRefCounter)
+			clientNetworkWatcher = newClientNetworkWatcher(m.ctx, m.dnsRouteInterval, m.wgInterface, m.statusRecorder, routes[0], m.routeRefCounter, m.allowedIPsRefCounter)
 			m.clientNetworks[id] = clientNetworkWatcher
 			go clientNetworkWatcher.peersStateAndUpdateWatcher()
 		}
