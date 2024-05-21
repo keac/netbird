@@ -15,13 +15,13 @@ type Nexthop struct {
 
 type ExclusionCounter = refcounter.Counter[any, Nexthop]
 
-type RoutingManager struct {
+type SysOps struct {
 	refCounter  *ExclusionCounter
 	wgInterface *iface.WGIface
 }
 
-func NewRoutingManager(wgInterface *iface.WGIface) *RoutingManager {
-	return &RoutingManager{
+func NewSysOps(wgInterface *iface.WGIface) *SysOps {
+	return &SysOps{
 		wgInterface: wgInterface,
 	}
 }
